@@ -12,6 +12,8 @@
         <module>inews-dev-model</module>
         <module>inews-dev-service-api</module>
         <module>inews-dev-service-user</module>
+        <module>inews-dev-service-files</module>
+        <module>inews-dev-service-admin</module>
     </modules>
 
     <!--

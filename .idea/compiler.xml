@@ -6,11 +6,13 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="mybatis-generator-database" />
-        <module name="inews-dev-common" />
         <module name="inews-dev-service-api" />
-        <module name="inews-dev-model" />
+        <module name="inews-dev-common" />
+        <module name="inews-dev-service-files" />
+        <module name="mybatis-generator-database" />
+        <module name="inews-dev-service-admin" />
         <module name="inews-dev-service-user" />
+        <module name="inews-dev-model" />
       </profile>
     </annotationProcessing>
   </component>
@@ -18,7 +20,9 @@
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="inews-dev-common" options="-parameters" />
       <module name="inews-dev-model" options="-parameters" />
+      <module name="inews-dev-service-admin" options="-parameters" />
       <module name="inews-dev-service-api" options="-parameters" />
+      <module name="inews-dev-service-files" options="-parameters" />
       <module name="inews-dev-service-user" options="-parameters" />
     </option>
   </component>

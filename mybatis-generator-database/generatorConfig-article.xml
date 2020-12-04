@@ -14,7 +14,7 @@
         </plugin>
 
         <jdbcConnection driverClass="com.mysql.jdbc.Driver"
-                        connectionURL="jdbc:mysql://localhost:3306/inews-dev"
+                        connectionURL="jdbc:mysql://txcloud:3306/inews-dev"
                         userId="root"
                         password="root">
         </jdbcConnection>
