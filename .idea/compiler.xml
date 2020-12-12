@@ -6,6 +6,7 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="inews-dev-service-article" />
         <module name="inews-dev-service-api" />
         <module name="inews-dev-common" />
         <module name="inews-dev-service-files" />
@@ -22,6 +23,7 @@
       <module name="inews-dev-model" options="-parameters" />
       <module name="inews-dev-service-admin" options="-parameters" />
       <module name="inews-dev-service-api" options="-parameters" />
+      <module name="inews-dev-service-article" options="-parameters" />
       <module name="inews-dev-service-files" options="-parameters" />
       <module name="inews-dev-service-user" options="-parameters" />
     </option>
