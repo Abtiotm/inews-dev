@@ -5,6 +5,7 @@ import the.eric.pojo.bo.NewArticleBO;
 import the.eric.utils.PagedGridResult;
 
 import java.util.Date;
+import java.util.List;
 
 public interface ArticleService {
 
@@ -17,6 +18,11 @@ public interface ArticleService {
      * 更新定时发布为即时发布
      */
     public void updateAppointToPublish();
+
+    /**
+     * 更新单条文章为即时发布
+     */
+    public void updateArticleToPublish(String articleId);
 
     /**
      * 用户中心 - 查询我的文章列表
@@ -33,6 +39,11 @@ public interface ArticleService {
      * 更改文章的状态
      */
     public void updateArticleStatus(String articleId, Integer pendingStatus);
+
+    /**
+     * 关联文章和gridfs的html文件id
+     */
+    public void updateArticleToGridFS(String articleId, String articleMongoId);
 
     /**
      * 管理员查询文章列表

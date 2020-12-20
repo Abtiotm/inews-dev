@@ -11,8 +11,8 @@ public interface CommentPortalService {
                               String fatherCommentId,
                               String content,
                               String userId,
-                              String nickname);
-
+                              String nickname,
+                              String face);
     /**
      * 查询文章评论列表
      */

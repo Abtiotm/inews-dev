@@ -1,6 +1,8 @@
 package the.eric.article.service.impl;
 
 import com.github.pagehelper.PageHelper;
+import the.eric.api.config.RabbitMQConfig;
+import the.eric.api.config.RabbitMQDelayConfig;
 import the.eric.api.service.BaseService;
 import the.eric.article.mapper.ArticleMapper;
 import the.eric.article.mapper.ArticleMapperCustom;
@@ -14,14 +16,27 @@ import the.eric.grace.result.ResponseStatusEnum;
 import the.eric.pojo.Article;
 import the.eric.pojo.Category;
 import the.eric.pojo.bo.NewArticleBO;
+import the.eric.utils.DateUtil;
 import the.eric.utils.PagedGridResult;
 import the.eric.utils.extend.AliTextReviewUtils;
+import com.mongodb.client.gridfs.GridFSBucket;
+import com.mongodb.gridfs.GridFS;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
+import org.checkerframework.checker.units.qual.A;
 import org.n3r.idworker.Sid;
+import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageDeliveryMode;
+import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 import tk.mybatis.mapper.entity.Example;
 
 import java.util.Date;
@@ -72,7 +87,48 @@ public class ArticleServiceImpl extends BaseService implements ArticleService {
         }
 
 
-        // 通过阿里智能AI实现对文章文本的自动检测（自动审核）；只检测正常的词汇
+        // 发送延迟消息到mq，计算定时发布时间和当前时间的时间差，则为往后延迟的时间
+        if (article.getIsAppoint() == ArticleAppointType.TIMING.type) {
+
+            Date endDate = newArticleBO.getPublishTime();
+            Date startDate = new Date();
+
+//            int delayTimes = (int)(endDate.getTime() - startDate.getTime());
+
+            System.out.println(DateUtil.timeBetween(startDate, endDate));
+
+            // FIXME: 为了测试方便，写死10s
+            int delayTimes = 10 * 1000;
+
+            MessagePostProcessor messagePostProcessor = new MessagePostProcessor() {
+                @Override
+                public Message postProcessMessage(Message message) throws AmqpException {
+                    // 设置消息的持久
+                    message.getMessageProperties()
+                            .setDeliveryMode(MessageDeliveryMode.PERSISTENT);
+                    // 设置消息延迟的时间，单位ms毫秒
+                    message.getMessageProperties()
+                            .setDelay(delayTimes);
+                    return message;
+                }
+            };
+
+            rabbitTemplate.convertAndSend(
+                    RabbitMQDelayConfig.EXCHANGE_DELAY,
+                    "publish.delay.display",
+                    articleId,
+                    messagePostProcessor);
+
+            System.out.println("延迟消息-定时发布文章：" + new Date());
+        }
+
+
+
+
+        /**
+         * FIXME: 我们只检测正常的词汇，非正常词汇大家课后去检测
+         */
+        // 通过阿里智能AI实现对文章文本的自动检测（自动审核）
 //        String reviewTextResult = aliTextReviewUtils.reviewTextContent(newArticleBO.getContent());
         String reviewTextResult = ArticleReviewLevel.REVIEW.type;
 
@@ -110,8 +166,26 @@ public class ArticleServiceImpl extends BaseService implements ArticleService {
 
     @Transactional
     @Override
+    public void updateArticleToGridFS(String articleId, String articleMongoId) {
+        Article pendingArticle = new Article();
+        pendingArticle.setId(articleId);
+        pendingArticle.setMongoFileId(articleMongoId);
+        articleMapper.updateByPrimaryKeySelective(pendingArticle);
+    }
+
+    @Transactional
+    @Override
     public void updateAppointToPublish() {
         articleMapperCustom.updateAppointToPublish();
+    }
+
+    @Transactional
+    @Override
+    public void updateArticleToPublish(String articleId) {
+        Article article = new Article();
+        article.setId(articleId);
+        article.setIsAppoint(ArticleAppointType.IMMEDIATELY.type);
+        articleMapper.updateByPrimaryKeySelective(article);
     }
 
     @Override
@@ -196,6 +270,44 @@ public class ArticleServiceImpl extends BaseService implements ArticleService {
         if (result != 1) {
             GraceException.display(ResponseStatusEnum.ARTICLE_DELETE_ERROR);
         }
+
+        deleteHTML(articleId);
+    }
+
+    @Autowired
+    private GridFSBucket gridFSBucket;
+    /**
+     * 文章撤回删除后，删除静态化的html
+     */
+    private void deleteHTML(String articleId) {
+        // 1. 查询文章的mongoFileId
+        Article pending = articleMapper.selectByPrimaryKey(articleId);
+        String articleMongoId = pending.getMongoFileId();
+
+        // 2. 删除GridFS上的文件
+        gridFSBucket.delete(new ObjectId(articleMongoId));
+
+        // 3. 删除消费端的HTML文件
+//        doDeleteArticleHTML(articleId);
+        doDeleteArticleHTMLByMQ(articleId);
+    }
+
+    @Autowired
+    public RestTemplate restTemplate;
+    private void doDeleteArticleHTML(String articleId) {
+        String url = "http://html.imoocnews.com:8002/article/html/delete?articleId=" + articleId;
+        ResponseEntity<Integer> responseEntity = restTemplate.getForEntity(url, Integer.class);
+        int status = responseEntity.getBody();
+        if (status != HttpStatus.OK.value()) {
+            GraceException.display(ResponseStatusEnum.SYSTEM_OPERATION_ERROR);
+        }
+    }
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+    private void doDeleteArticleHTMLByMQ(String articleId) {
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_ARTICLE,
+                "article.html.download.do", articleId);
     }
 
     @Transactional
@@ -210,6 +322,8 @@ public class ArticleServiceImpl extends BaseService implements ArticleService {
         if (result != 1) {
             GraceException.display(ResponseStatusEnum.ARTICLE_WITHDRAW_ERROR);
         }
+
+        deleteHTML(articleId);
     }
 
     private Example makeExampleCriteria(String userId, String articleId) {

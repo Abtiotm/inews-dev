@@ -7,6 +7,7 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="inews-dev-service-article" />
+        <module name="inews-dev-service-article-html" />
         <module name="inews-dev-common" />
         <module name="inews-dev-service-api" />
         <module name="mybatis-generator-database" />
@@ -24,6 +25,7 @@
       <module name="inews-dev-service-admin" options="-parameters" />
       <module name="inews-dev-service-api" options="-parameters" />
       <module name="inews-dev-service-article" options="-parameters" />
+      <module name="inews-dev-service-article-html" options="-parameters" />
       <module name="inews-dev-service-files" options="-parameters" />
       <module name="inews-dev-service-user" options="-parameters" />
     </option>

@@ -1,28 +1,47 @@
 package the.eric.article.controller;
 
 import the.eric.api.BaseController;
+import the.eric.api.config.RabbitMQConfig;
 import the.eric.api.controller.article.ArticleControllerApi;
+import the.eric.api.controller.user.HelloControllerApi;
 import the.eric.article.service.ArticleService;
 import the.eric.enums.ArticleCoverType;
 import the.eric.enums.ArticleReviewStatus;
 import the.eric.enums.YesOrNo;
+import the.eric.exception.GraceException;
 import the.eric.grace.result.GraceJSONResult;
 import the.eric.grace.result.ResponseStatusEnum;
 import the.eric.pojo.Category;
 import the.eric.pojo.bo.NewArticleBO;
+import the.eric.pojo.vo.AppUserVO;
+import the.eric.pojo.vo.ArticleDetailVO;
 import the.eric.utils.JsonUtils;
 import the.eric.utils.PagedGridResult;
+import com.mongodb.client.gridfs.GridFSBucket;
+import freemarker.template.Configuration;
+import freemarker.template.Template;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.ui.Model;
+import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 
 import javax.validation.Valid;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.InputStream;
+import java.io.Writer;
+import java.util.*;
 
 @RestController
 public class ArticleController extends BaseController implements ArticleControllerApi {
@@ -99,12 +118,12 @@ public class ArticleController extends BaseController implements ArticleControll
 
         // 查询我的列表，调用service
         PagedGridResult grid = articleService.queryMyArticleList(userId,
-                                            keyword,
-                                            status,
-                                            startDate,
-                                            endDate,
-                                            page,
-                                            pageSize);
+                keyword,
+                status,
+                startDate,
+                endDate,
+                page,
+                pageSize);
 
         return GraceJSONResult.ok(grid);
     }
@@ -142,8 +161,121 @@ public class ArticleController extends BaseController implements ArticleControll
         // 保存到数据库，更改文章的状态为审核成功或者失败
         articleService.updateArticleStatus(articleId, pendingStatus);
 
+        if (pendingStatus == ArticleReviewStatus.SUCCESS.type) {
+            // 审核成功，生成文章详情页静态html
+            try {
+//                createArticleHTML(articleId);
+                String articleMongoId = createArticleHTMLToGridFS(articleId);
+                // 存储到对应的文章，进行关联保存
+                articleService.updateArticleToGridFS(articleId, articleMongoId);
+
+                // 调用消费端，执行下载html
+//                doDownloadArticleHTML(articleId, articleMongoId);
+
+                // 发送消息到mq队列，让消费者监听并且执行下载html
+                doDownloadArticleHTMLByMQ(articleId, articleMongoId);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
         return GraceJSONResult.ok();
     }
+
+    private void doDownloadArticleHTML(String articleId, String articleMongoId) {
+
+        String url =
+                "http://html.imoocnews.com:8002/article/html/download?articleId="
+                        + articleId +
+                        "&articleMongoId="
+                        + articleMongoId;
+        ResponseEntity<Integer> responseEntity = restTemplate.getForEntity(url, Integer.class);
+        int status = responseEntity.getBody();
+        if (status != HttpStatus.OK.value()) {
+            GraceException.display(ResponseStatusEnum.ARTICLE_REVIEW_ERROR);
+        }
+    }
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+
+    private void doDownloadArticleHTMLByMQ(String articleId, String articleMongoId) {
+
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.EXCHANGE_ARTICLE,
+                "article.download.do",
+                articleId + "," + articleMongoId);
+    }
+
+    @Value("${freemarker.html.article}")
+    private String articlePath;
+
+    // 文章生成HTML
+    public void createArticleHTML(String articleId) throws Exception {
+
+        Configuration cfg = new Configuration(Configuration.getVersion());
+        String classpath = this.getClass().getResource("/").getPath();
+        cfg.setDirectoryForTemplateLoading(new File(classpath + "templates"));
+
+        Template template = cfg.getTemplate("detail.ftl", "utf-8");
+
+        // 获得文章的详情数据
+        ArticleDetailVO detailVO = getArticleDetail(articleId);
+        Map<String, Object> map = new HashMap<>();
+        map.put("articleDetail", detailVO);
+
+        File tempDic = new File(articlePath);
+        if (!tempDic.exists()) {
+            tempDic.mkdirs();
+        }
+
+        String path = articlePath + File.separator + detailVO.getId() + ".html";
+
+        Writer out = new FileWriter(path);
+        template.process(map, out);
+        out.close();
+    }
+
+    @Autowired
+    private GridFSBucket gridFSBucket;
+
+    // 文章生成HTML
+    public String createArticleHTMLToGridFS(String articleId) throws Exception {
+
+        Configuration cfg = new Configuration(Configuration.getVersion());
+        String classpath = this.getClass().getResource("/").getPath();
+        cfg.setDirectoryForTemplateLoading(new File(classpath + "templates"));
+
+        Template template = cfg.getTemplate("detail.ftl", "utf-8");
+
+        // 获得文章的详情数据
+        ArticleDetailVO detailVO = getArticleDetail(articleId);
+        Map<String, Object> map = new HashMap<>();
+        map.put("articleDetail", detailVO);
+
+        String htmlContent = FreeMarkerTemplateUtils.processTemplateIntoString(template, map);
+//        System.out.println(htmlContent);
+
+        InputStream inputStream = IOUtils.toInputStream(htmlContent);
+        ObjectId fileId = gridFSBucket.uploadFromStream(detailVO.getId() + ".html",inputStream);
+        return fileId.toString();
+    }
+
+    // 发起远程调用rest，获得文章详情数据
+    public ArticleDetailVO getArticleDetail(String articleId) {
+        String url
+                = "http://www.imoocnews.com:8001/portal/article/detail?articleId=" + articleId;
+        ResponseEntity<GraceJSONResult> responseEntity
+                = restTemplate.getForEntity(url, GraceJSONResult.class);
+        GraceJSONResult bodyResult = responseEntity.getBody();
+        ArticleDetailVO detailVO = null;
+        if (bodyResult.getStatus() == 200) {
+            String detailJson = JsonUtils.objectToJson(bodyResult.getData());
+            detailVO = JsonUtils.jsonToPojo(detailJson, ArticleDetailVO.class);
+        }
+        return detailVO;
+    }
+
 
     @Override
     public GraceJSONResult delete(String userId, String articleId) {

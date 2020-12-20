@@ -9,7 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>inews-dev-service-article</artifactId>
+    <artifactId>inews-dev-service-article-html</artifactId>
 
     <dependencies>
         <dependency>

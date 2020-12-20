@@ -10,9 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import the.eric.exception.GraceException;
-import the.eric.grace.result.ResponseStatusEnum;
-import the.eric.utils.extend.AliyunResource;
+
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;

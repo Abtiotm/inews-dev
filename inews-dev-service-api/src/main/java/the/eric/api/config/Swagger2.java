@@ -24,17 +24,17 @@ public class Swagger2 {
     // 配置swagger2核心配置 docket
     @Bean
     public Docket createRestApi() {
-//        Predicate<RequestHandler> adminPredicate = RequestHandlerSelectors.basePackage("the.eric.admin.controller");
-//        Predicate<RequestHandler> articlePredicate = RequestHandlerSelectors.basePackage("the.eric.article.controller");
+        Predicate<RequestHandler> adminPredicate = RequestHandlerSelectors.basePackage("the.eric.admin.controller");
+        Predicate<RequestHandler> articlePredicate = RequestHandlerSelectors.basePackage("the.eric.article.controller");
         Predicate<RequestHandler> userPredicate = RequestHandlerSelectors.basePackage("the.eric.user.controller");
-//        Predicate<RequestHandler> filesPredicate = RequestHandlerSelectors.basePackage("the.eric.files.controller");
+        Predicate<RequestHandler> filesPredicate = RequestHandlerSelectors.basePackage("the.eric.files.controller");
 
         return new Docket(DocumentationType.SWAGGER_2)  // 指定api类型为swagger2
                 .apiInfo(apiInfo())                 // 用于定义api文档汇总信息
                 .select()
                 .apis(Predicates.or(userPredicate))
-//                .apis(Predicates.or(userPredicate, adminPredicate, filesPredicate))
-//                .apis(Predicates.or(adminPredicate, articlePredicate, userPredicate, filesPredicate))
+                .apis(Predicates.or(userPredicate, adminPredicate, filesPredicate))
+                .apis(Predicates.or(adminPredicate, articlePredicate, userPredicate, filesPredicate))
                 .paths(PathSelectors.any())         // 所有controller
                 .build();
     }

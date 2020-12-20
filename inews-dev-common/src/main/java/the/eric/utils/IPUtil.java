@@ -1,6 +1,5 @@
 package the.eric.utils;
 
-
 import javax.servlet.http.HttpServletRequest;
 
 /**
