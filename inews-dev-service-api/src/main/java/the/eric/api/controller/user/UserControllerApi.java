@@ -1,17 +1,23 @@
 package the.eric.api.controller.user;
 
+import the.eric.api.config.MyServiceList;
+import the.eric.api.controller.user.fallbacks.UserControllerFactoryFallback;
 import the.eric.grace.result.GraceJSONResult;
+import the.eric.pojo.bo.RegistLoginBO;
 import the.eric.pojo.bo.UpdateUserInfoBO;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
-import the.eric.grace.result.GraceJSONResult;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
 @Api(value = "用户信息相关Controller", tags = {"用户信息相关Controller"})
 @RequestMapping("user")
+@FeignClient(value = MyServiceList.SERVICE_USER, fallbackFactory = UserControllerFactoryFallback.class)
 public interface UserControllerApi {
 
     @ApiOperation(value = "获得用户基本信息", notes = "获得用户基本信息", httpMethod = "POST")
@@ -25,8 +31,10 @@ public interface UserControllerApi {
     @ApiOperation(value = "修改/完善用户信息", notes = "修改/完善用户信息", httpMethod = "POST")
     @PostMapping("/updateUserInfo")
     public GraceJSONResult updateUserInfo(
-            @RequestBody @Valid UpdateUserInfoBO updateUserInfoBO,
-            BindingResult result);
+            @RequestBody @Valid UpdateUserInfoBO updateUserInfoBO);
+//    public GraceJSONResult updateUserInfo(
+//            @RequestBody @Valid UpdateUserInfoBO updateUserInfoBO,
+//            @RequestParam BindingResult result);
 
     @ApiOperation(value = "根据用户的ids查询用户列表", notes = "根据用户的ids查询用户列表", httpMethod = "GET")
     @GetMapping("/queryByIds")

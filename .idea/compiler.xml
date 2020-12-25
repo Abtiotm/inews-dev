@@ -6,15 +6,19 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="inews-dev-service-article" />
-        <module name="inews-dev-service-article-html" />
         <module name="inews-dev-common" />
-        <module name="inews-dev-service-api" />
-        <module name="mybatis-generator-database" />
-        <module name="inews-dev-service-files" />
-        <module name="inews-dev-service-admin" />
         <module name="inews-dev-service-user" />
         <module name="inews-dev-model" />
+        <module name="mybatis-generator-database" />
+        <module name="inews-dev-service-admin" />
+        <module name="inews-dev-service-article" />
+        <module name="springcloud-config" />
+        <module name="inews-dev-service-api" />
+        <module name="springcloud-eureka" />
+        <module name="springcloud-eureka-cluster" />
+        <module name="inews-dev-service-files" />
+        <module name="springcloud-zuul-server" />
+        <module name="inews-dev-service-article-html" />
       </profile>
     </annotationProcessing>
   </component>
@@ -28,6 +32,10 @@
       <module name="inews-dev-service-article-html" options="-parameters" />
       <module name="inews-dev-service-files" options="-parameters" />
       <module name="inews-dev-service-user" options="-parameters" />
+      <module name="springcloud-config" options="-parameters" />
+      <module name="springcloud-eureka" options="-parameters" />
+      <module name="springcloud-eureka-cluster" options="-parameters" />
+      <module name="springcloud-zuul-server" options="-parameters" />
     </option>
   </component>
 </project>

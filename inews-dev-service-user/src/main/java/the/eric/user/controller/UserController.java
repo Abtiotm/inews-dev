@@ -1,23 +1,29 @@
 package the.eric.user.controller;
 
 import the.eric.api.BaseController;
+import the.eric.api.controller.user.HelloControllerApi;
 import the.eric.api.controller.user.UserControllerApi;
 import the.eric.grace.result.GraceJSONResult;
 import the.eric.grace.result.ResponseStatusEnum;
 import the.eric.pojo.AppUser;
 import the.eric.pojo.bo.UpdateUserInfoBO;
 import the.eric.pojo.vo.AppUserVO;
+import the.eric.pojo.vo.PublisherVO;
 import the.eric.pojo.vo.UserAccountInfoVO;
 import the.eric.user.service.UserService;
 import the.eric.utils.JsonUtils;
+import the.eric.utils.RedisOperator;
+import com.netflix.hystrix.contrib.javanica.annotation.DefaultProperties;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-
 
 import javax.validation.Valid;
 import java.util.ArrayList;
@@ -25,12 +31,18 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
+@DefaultProperties(defaultFallback = "defaultFallback")
 public class UserController extends BaseController implements UserControllerApi {
 
     final static Logger logger = LoggerFactory.getLogger(UserController.class);
 
     @Autowired
     private UserService userService;
+
+    public GraceJSONResult defaultFallback() {
+        System.out.println("全局降级");
+        return GraceJSONResult.errorCustom(ResponseStatusEnum.SYSTEM_ERROR_GLOBAL);
+    }
 
     @Override
     public GraceJSONResult getUserInfo(String userId) {
@@ -86,27 +98,40 @@ public class UserController extends BaseController implements UserControllerApi 
         return user;
     }
 
-
-
-
     @Override
     public GraceJSONResult updateUserInfo(
-            @Valid UpdateUserInfoBO updateUserInfoBO,
-            BindingResult result) {
-
-        // 0. 校验BO
-        if (result.hasErrors()) {
-            Map<String, String> map = getErrors(result);
-            return GraceJSONResult.errorMap(map);
-        }
+            @Valid UpdateUserInfoBO updateUserInfoBO) {
+//            , BindingResult result) {
+//
+//        // 0. 校验BO
+//        if (result.hasErrors()) {
+//            Map<String, String> map = getErrors(result);
+//            return GraceJSONResult.errorMap(map);
+//        }
 
         // 1. 执行更新操作
         userService.updateUserInfo(updateUserInfoBO);
         return GraceJSONResult.ok();
     }
 
+    @Value("${server.port}")
+    private String myPort;
+
+    @HystrixCommand//(fallbackMethod = "queryByIdsFallback")
     @Override
     public GraceJSONResult queryByIds(String userIds) {
+
+        // 1. 手动触发异常
+//        int a = 1 / 0;
+
+        // 2. 模拟超时异常
+//        try {
+//            Thread.sleep(6000);
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+
+        System.out.println("myPort=" + myPort);
 
         if (StringUtils.isBlank(userIds)) {
             return GraceJSONResult.errorCustom(ResponseStatusEnum.USER_NOT_EXIST_ERROR);
@@ -114,6 +139,19 @@ public class UserController extends BaseController implements UserControllerApi 
 
         List<AppUserVO> publisherList = new ArrayList<>();
         List<String> userIdList = JsonUtils.jsonToList(userIds, String.class);
+
+        // FIXME: 仅用于dev测试，硬编码动态判断来抛出异常
+        if (userIdList.size() > 1) {
+            System.out.println("出现异常~~");
+            throw new RuntimeException("出现异常~~");
+        }
+
+        // FIXME: 仅用于dev，硬编码动态判断抛出异常
+//        if (!userIdList.get(0).equalsIgnoreCase("200628AFYM7AGWPH")) {
+//            System.out.println("出异常啦~");
+//            throw new RuntimeException("出异常啦~");
+//        }
+
         for (String userId : userIdList) {
             // 获得用户基本信息
             AppUserVO userVO = getBasicUserInfo(userId);
@@ -121,6 +159,20 @@ public class UserController extends BaseController implements UserControllerApi 
             publisherList.add(userVO);
         }
 
+        return GraceJSONResult.ok(publisherList);
+    }
+
+    public GraceJSONResult queryByIdsFallback(String userIds) {
+
+        System.out.println("进入降级方法：queryByIdsFallback");
+
+        List<AppUserVO> publisherList = new ArrayList<>();
+        List<String> userIdList = JsonUtils.jsonToList(userIds, String.class);
+        for (String userId : userIdList) {
+            // 手动构建空对象，详情页所展示的用户信息可有可无
+            AppUserVO userVO = new AppUserVO();
+            publisherList.add(userVO);
+        }
         return GraceJSONResult.ok(publisherList);
     }
 

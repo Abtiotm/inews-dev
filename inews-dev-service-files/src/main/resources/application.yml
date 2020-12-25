@@ -28,7 +28,7 @@ spring:
       max-request-size: 512000
   data:
     mongodb:
-      uri: mongodb://root:root@txcloud:27017
+      uri: mongodb://root:root@localhost:27017
       database: inews
 
 ############################################################
